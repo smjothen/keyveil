@@ -153,6 +153,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         // ── B: Display / layout ───────────────────────────────────────────────
         menu.addItem(.separator())
 
+        menu.addItem(target(title: "Reload SVGs", action: #selector(reloadSVGs)))
+
         let compact = target(title: "Compact Spacing", action: #selector(toggleCompact))
         compact.state = compactSpacing ? .on : .off
         menu.addItem(compact)
@@ -269,6 +271,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     }
 
     // ── Setting actions ───────────────────────────────────────────────────────
+
+    @objc private func reloadSVGs() {
+        rebuildContent()
+    }
 
     @objc private func toggleCompact() {
         compactSpacing.toggle()
