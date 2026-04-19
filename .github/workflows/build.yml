@@ -1,0 +1,58 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [created]
+
+jobs:
+  build:
+    name: Build Keyveil.app
+    runs-on: macos-14   # Apple Silicon runner; can cross-compile to x86_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build arm64
+        run: swift build -c release --arch arm64
+
+      - name: Build x86_64
+        run: swift build -c release --arch x86_64
+
+      - name: Assemble .app bundle
+        run: |
+          mkdir -p Keyveil.app/Contents/MacOS
+          lipo -create \
+            .build/arm64-apple-macosx/release/SVGPopup \
+            .build/x86_64-apple-macosx/release/SVGPopup \
+            -output Keyveil.app/Contents/MacOS/Keyveil
+          cp Info.plist Keyveil.app/Contents/Info.plist
+          lipo -info Keyveil.app/Contents/MacOS/Keyveil
+
+      - name: Stamp version from release tag
+        if: github.event_name == 'release'
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"   # strip leading 'v' if present
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" \
+            Keyveil.app/Contents/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" \
+            Keyveil.app/Contents/Info.plist
+
+      - name: Zip .app
+        run: ditto -c -k --sequesterRsrc --keepParent Keyveil.app Keyveil.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Keyveil
+          path: Keyveil.zip
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Keyveil.zip
