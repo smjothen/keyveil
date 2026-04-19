@@ -24,5 +24,7 @@
     <true/>
     <key>LSUIElement</key>
     <true/>
+    <key>CFBundleIconFile</key>
+    <string>Keyveil</string>
 </dict>
 </plist>

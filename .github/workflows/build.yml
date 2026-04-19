@@ -16,6 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install librsvg
+        run: brew install librsvg
+
+      - name: Generate icon
+        run: bash scripts/make_icon.sh
+
       - name: Build arm64
         run: swift build -c release --arch arm64
 
@@ -31,6 +37,11 @@ jobs:
             -output Keyveil.app/Contents/MacOS/Keyveil
           cp Info.plist Keyveil.app/Contents/Info.plist
           lipo -info Keyveil.app/Contents/MacOS/Keyveil
+
+      - name: Copy icon into bundle
+        run: |
+          mkdir -p Keyveil.app/Contents/Resources
+          cp Keyveil.icns Keyveil.app/Contents/Resources/
 
       - name: Stamp version from release tag
         if: github.event_name == 'release'

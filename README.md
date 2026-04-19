@@ -55,6 +55,12 @@ lipo -create \
   -output Keyveil.app/Contents/MacOS/Keyveil
 cp Info.plist Keyveil.app/Contents/Info.plist
 
+# Generate and copy the app icon (requires librsvg)
+brew install librsvg
+bash scripts/make_icon.sh
+mkdir -p Keyveil.app/Contents/Resources
+cp Keyveil.icns Keyveil.app/Contents/Resources/
+
 # Move to Applications (optional)
 mv Keyveil.app /Applications/
 ```
