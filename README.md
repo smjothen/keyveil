@@ -2,6 +2,8 @@
 
 A lightweight macOS menu bar app that displays SVG keyboard layout overlays in a transparent, always-on-top panel. Built for use with [keymap-drawer](https://github.com/caksoylar/keymap-drawer) and similar tools.
 
+![Keyveil showing a split keyboard layout floating over the macOS desktop](docs/screenshot.png)
+
 ---
 
 ## Features
