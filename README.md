@@ -50,8 +50,8 @@ swift build -c release --arch x86_64
 # Assemble universal .app bundle
 mkdir -p Keyveil.app/Contents/MacOS
 lipo -create \
-  .build/arm64-apple-macosx/release/SVGPopup \
-  .build/x86_64-apple-macosx/release/SVGPopup \
+  .build/arm64-apple-macosx/release/Keyveil \
+  .build/x86_64-apple-macosx/release/Keyveil \
   -output Keyveil.app/Contents/MacOS/Keyveil
 cp Info.plist Keyveil.app/Contents/Info.plist
 

@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "SVGPopup",
+    name: "Keyveil",
     platforms: [.macOS(.v13)],
     targets: [
         .executableTarget(
-            name: "SVGPopup",
+            name: "Keyveil",
             path: "Sources",
             linkerSettings: [
                 .linkedFramework("Carbon"),
