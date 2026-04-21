@@ -53,6 +53,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     // Feature 9 – Scale
     private var scalePercent: Int = 100
 
+    // Feature 10 – WebKit SVG sanitization
+    private var sanitizeSVGForWebKitEnabled = true
+
+    // Feature 11 – Optional per-image card
+    private var showPerImageWhiteCard = false
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -95,6 +101,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         selectedScreenIndex = UserDefaults.standard.object(forKey: "selectedScreenIndex") as? Int ?? 0
         trimPadding         = UserDefaults.standard.object(forKey: "trimPadding")         as? Int ?? 4
         scalePercent        = UserDefaults.standard.object(forKey: "scalePercent")        as? Int ?? 100
+        if UserDefaults.standard.object(forKey: "sanitizeSVGForWebKitEnabled") != nil {
+            sanitizeSVGForWebKitEnabled = UserDefaults.standard.bool(forKey: "sanitizeSVGForWebKitEnabled")
+        }
+        showPerImageWhiteCard = UserDefaults.standard.bool(forKey: "showPerImageWhiteCard")
 
         if UserDefaults.standard.object(forKey: "customPositionX") != nil {
             customPosition = CGPoint(
@@ -113,6 +123,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         UserDefaults.standard.set(selectedScreenIndex,  forKey: "selectedScreenIndex")
         UserDefaults.standard.set(trimPadding,          forKey: "trimPadding")
         UserDefaults.standard.set(scalePercent,         forKey: "scalePercent")
+        UserDefaults.standard.set(sanitizeSVGForWebKitEnabled, forKey: "sanitizeSVGForWebKitEnabled")
+        UserDefaults.standard.set(showPerImageWhiteCard, forKey: "showPerImageWhiteCard")
 
         if let pos = customPosition {
             UserDefaults.standard.set(pos.x, forKey: "customPositionX")
@@ -167,6 +179,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         menu.addItem(submenu("Trim Whitespace", items: trimOptions.map { label, val in
             checked(label, action: #selector(setTrimPadding(_:)), value: val, current: trimPadding)
         }))
+
+        let webkitFix = target(title: "SVG Compatibility Mode", action: #selector(toggleWebKitSVGFix))
+        webkitFix.state = sanitizeSVGForWebKitEnabled ? .on : .off
+        menu.addItem(webkitFix)
+
+        let whiteCard = target(title: "White Image Card", action: #selector(toggleWhiteImageCard))
+        whiteCard.state = showPerImageWhiteCard ? .on : .off
+        menu.addItem(whiteCard)
 
         // ── C: Opacity ────────────────────────────────────────────────────────
         menu.addItem(.separator())
@@ -285,11 +305,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         guard let val = sender.representedObject as? Double else { return }
         overlayOpacity = val
         saveState(); rebuildMenu()
-        guard let panel = sidebar, panel.isVisible else { return }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.15
-            panel.animator().alphaValue = CGFloat(overlayOpacity)
-        }
+        guard let wv = webView, sidebar?.isVisible == true else { return }
+        wv.evaluateJavaScript("document.body.style.opacity = '\(overlayOpacity)'", completionHandler: nil)
     }
 
     @objc private func setScale(_ sender: NSMenuItem) {
@@ -301,6 +318,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     @objc private func setTrimPadding(_ sender: NSMenuItem) {
         guard let val = sender.representedObject as? Int else { return }
         trimPadding = val
+        saveState(); rebuildMenu(); rebuildContent()
+    }
+
+    @objc private func toggleWebKitSVGFix() {
+        sanitizeSVGForWebKitEnabled.toggle()
+        saveState(); rebuildMenu(); rebuildContent()
+    }
+
+    @objc private func toggleWhiteImageCard() {
+        showPerImageWhiteCard.toggle()
         saveState(); rebuildMenu(); rebuildContent()
     }
 
@@ -397,7 +424,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView = wv
-        panel.alphaValue = CGFloat(overlayOpacity)
+        panel.alphaValue = 1
         sidebar = panel
 
         if !svgFiles.isEmpty {
@@ -448,20 +475,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
         var items = ""
         for (i, url) in svgFiles.enumerated() {
-            guard let svg = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            guard let raw = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            let svg = sanitizeSVGForWebKitEnabled ? sanitizeSVGForWebKit(raw) : raw
             if i > 0 { items += "<div class='divider'></div>" }
             let label = svgFiles.count > 1 ? "<p class='label'>\(url.lastPathComponent)</p>" : ""
-            items += "<div class='item'>\(svg)\(label)</div>"
+            let visual = showPerImageWhiteCard ? "<div class='svg-card'>\(svg)</div>" : svg
+            items += "<div class='item'>\(visual)\(label)</div>"
         }
+
+        let bodyClass = showPerImageWhiteCard ? "with-image-card" : ""
 
         let html = """
         <!DOCTYPE html><html><head><meta charset="utf-8">
         <style>
         * { margin: 0; padding: 0; }
         html, body { background: transparent; font-family: -apple-system, sans-serif; }
-        body { zoom: \(scalePercent)%; }
+        body { zoom: \(scalePercent)%; opacity: \(overlayOpacity); transition: opacity 0.15s linear; }
         ::-webkit-scrollbar { display: none; }
         .item { padding: \(compactSpacing ? "0" : "8px 0"); }
+        .svg-card { display: inline-block; background: transparent; }
+        body.with-image-card .svg-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 8px;
+        }
         .item svg { display: block; }
         .label { font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
                  text-transform: uppercase; color: white;
@@ -470,7 +507,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                  margin-bottom: \(compactSpacing ? "2px" : "4px"); }
         .divider { height: \(compactSpacing ? "4px" : "12px"); }
         </style></head>
-        <body>\(items)</body></html>
+        <body class='\(bodyClass)'>\(items)</body></html>
         """
         wv.loadHTMLString(html, baseURL: nil)
     }
@@ -498,6 +535,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         });
         """
         webView.evaluateJavaScript(trim) { _, _ in restore() }
+    }
+
+    private func sanitizeSVGForWebKit(_ content: String) -> String {
+        var svg = content
+        svg = svg.replacingOccurrences(of: "<defs>/* start glyphs */", with: "<defs>")
+        svg = svg.replacingOccurrences(of: "</defs>/* end glyphs */", with: "</defs>")
+        svg = convertNestedGlyphSVGsToSymbols(in: svg)
+        svg = normalizeFragmentIDs(in: svg)
+        return svg
+    }
+
+    private func convertNestedGlyphSVGsToSymbols(in content: String) -> String {
+        let pattern = #"<svg\s+id="([^"]+)">\s*<svg([^>]*)>(.*?)</svg>\s*</svg>"#
+        guard let regex = try? NSRegularExpression(
+            pattern: pattern,
+            options: [.dotMatchesLineSeparators]
+        ) else {
+            return content
+        }
+        let range = NSRange(content.startIndex..., in: content)
+        return regex.stringByReplacingMatches(
+            in: content,
+            options: [],
+            range: range,
+            withTemplate: #"<symbol id="$1"$2>$3</symbol>"#
+        )
+    }
+
+    private func normalizeFragmentIDs(in content: String) -> String {
+        guard let idRegex = try? NSRegularExpression(pattern: #"id="([^"]*:[^"]*)""#) else {
+            return content
+        }
+
+        let range = NSRange(content.startIndex..., in: content)
+        let matches = idRegex.matches(in: content, options: [], range: range)
+        if matches.isEmpty { return content }
+
+        var ids: [(old: String, new: String)] = []
+        var seen = Set<String>()
+
+        for match in matches {
+            guard let idRange = Range(match.range(at: 1), in: content) else { continue }
+            let oldID = String(content[idRange])
+            guard seen.insert(oldID).inserted else { continue }
+            ids.append((old: oldID, new: oldID.replacingOccurrences(of: ":", with: "_")))
+        }
+
+        var svg = content
+        for id in ids {
+            svg = svg.replacingOccurrences(of: "id=\"\(id.old)\"", with: "id=\"\(id.new)\"")
+            svg = svg.replacingOccurrences(of: "href=\"#\(id.old)\"", with: "href=\"#\(id.new)\"")
+            svg = svg.replacingOccurrences(of: "xlink:href=\"#\(id.old)\"", with: "xlink:href=\"#\(id.new)\"")
+            svg = svg.replacingOccurrences(of: "url(#\(id.old))", with: "url(#\(id.new))")
+        }
+        return svg
     }
 
     // ── File monitoring ───────────────────────────────────────────────────────
@@ -589,7 +681,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         panel.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.15
-            panel.animator().alphaValue = CGFloat(overlayOpacity)
+            panel.animator().alphaValue = 1
         }
         autoHideTask?.cancel()
         if autoHideSeconds > 0 {

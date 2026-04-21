@@ -19,6 +19,7 @@ A lightweight macOS menu bar app that displays SVG keyboard layout overlays in a
 - **Draggable** — reposition freely and save position across restarts
 - **Opacity control** — 25 / 50 / 75 / 100 %
 - **Scale** — zoom content from 50 % to 200 %
+- **White image card** — optional opaque rounded background behind each SVG
 - **Multi-display** — choose which monitor to appear on
 - **Compact spacing** — reduce padding between stacked SVGs
 - **Launch at login** — one-click toggle in the menu bar
@@ -97,6 +98,8 @@ Click **Add SVG…** in the menu bar to load one or more SVG files. Files are re
 | **Compact Spacing** | Reduce padding between stacked SVGs |
 | **Scale** | Zoom content: 50 – 200 % |
 | **Trim Whitespace** | Crop SVG margins: Off / Tight / Normal / Loose |
+| **White Image Card** | Show an opaque rounded white card behind each SVG |
+| **SVG Compatibility Mode** | Sanitize tricky SVG defs/ids for WKWebView |
 | **Opacity** | Panel transparency: 25 – 100 % |
 | **Corner** | Snap to a screen corner |
 | **Reposition…** | Enable dragging; click **Lock Position** when done |
